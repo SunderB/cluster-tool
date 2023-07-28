@@ -42,7 +42,7 @@ header_names = None
 if (args.data_header):
     header = None # No header row - use specified header names
     with open(args.data_header) as f:
-        header_names = ",".split(f.readline())
+        header_names = f.readline().split(",")
 
 try:
     if (args.force_all_steps):
@@ -64,6 +64,9 @@ except Exception as e:
         delimiter=args.data_sep,
         names=header_names
     )
+
+print("Data loaded:")
+print(data)
 
 # Apply mass limits
 data = data.loc[data["mass"] > args.min_mass]
