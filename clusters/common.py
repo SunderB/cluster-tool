@@ -28,3 +28,32 @@ def pair_distances(pos: np.ndarray) -> np.ndarray:
     
     # Calculate distances between each pair
     return np.sqrt(np.sum(np.power(diff, 2), axis=0))
+
+def pair_distances_two_sets(pos1: np.ndarray, pos2: np.ndarray) -> np.ndarray:
+    """
+    Calculate the distances between each point in one list to each point in
+    another list.
+
+    Parameters
+    ----------
+    pos1: np.ndarray
+        Positions of sample points
+
+    pos2: np.ndarray
+        Positions of control points
+
+    Returns
+    -------
+    np.ndarray
+        Distances between points from 1 and points from 2
+    """
+     # Setup arrays
+    diff = np.zeros((len(pos1[0]),len(pos1),len(pos2)))
+
+    # Calculate difference in x and y between all unique pairs
+    for i in range(0, len(pos1)):
+        for j in range(0, len(pos1[0])):
+            diff[j][i] = pos2[:,j]-pos1[i,j]
+
+    # Calculate distances between each pair
+    return np.sqrt(np.sum(np.power(diff, 2), axis=0))

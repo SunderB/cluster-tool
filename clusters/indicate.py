@@ -19,7 +19,7 @@ under the MIT Licence.
 import numpy as np
 from numpy import random
 import time
-from .common import pair_distances
+from .common import pair_distances, pair_distances_two_sets
 
 def _get_bounding_box(pos: np.ndarray, padding: float = 0.0) -> tuple[list, list, float]:
     """
@@ -96,16 +96,9 @@ def _find_nn(n: int, pos1: np.ndarray, pos2: np.ndarray) -> float:
     float
         Mean distance to the `n`-th nearest control neighbour of each sample point
     """
-     # Setup arrays
-    diff = np.zeros((len(pos1[0]),len(pos1),len(pos2)))
-
-    # Calculate difference in x and y between all unique pairs
-    for i in range(0, len(pos1)):
-        for j in range(0, len(pos1[0])):
-            diff[j][i] = pos2[:,j]-pos1[i,j]
 
     # Calculate distances between each pair
-    distances = np.sqrt(np.sum(np.power(diff, 2), axis=0))
+    distances = pair_distances_two_sets(pos1, pos2)
 
     # Sort each row
     distances = np.sort(distances, axis=1)

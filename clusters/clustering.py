@@ -5,10 +5,11 @@ from sklearn.cluster import DBSCAN
 from IMF.maschberger_imf import MaschbergerIMF
 from clusters.indicate import indicate
 from clusters.energies import calculate_ke, calculate_pe
+from clusters.common import pair_distances_two_sets
 
 def find_clusters(data: pd.DataFrame, dimensions: int, eps: float, min_samples: int, pos_axes: list = ["x", "y", "z"]) -> pd.DataFrame:
     """
-    Find binary clusters in simulation data using DBSCAN.
+    Find clusters in simulation data using DBSCAN.
     
     Parameters
     ----------
@@ -49,27 +50,65 @@ def find_clusters(data: pd.DataFrame, dimensions: int, eps: float, min_samples: 
         
     db = DBSCAN(eps=eps, min_samples=min_samples)
 
-    for snapshot in range(max(data["snapshot"]),-1,-1):
+    old_clusters = []
+    for snapshot in range(0,max(data["snapshot"])+1):
         snapshot_data = data.loc[data["snapshot"] == snapshot]
-        star_ids = snapshot_data["star_id"].tolist()
         positions = snapshot_data[pos_axes[0:dimensions]]
 
         # Run DBSCAN
         db = db.fit(positions)
-        labels = db.labels_.tolist()
+        labels = db.labels_
+        new_cluster_ids = list(range(0, max(labels)+1))
 
-        if (tracked_star == None):
-            tracked_star = star_ids[labels.index(1)]
-        elif (max(labels) == 1 and snapshot < len(data["snapshot"])-1):
-            tracked_star_pos = star_ids.index(tracked_star)
-            if (labels[tracked_star_pos] == 0):
-                # Swap the cluster names
-                labels = list(map(_swap_cluster_ids, labels))
+        # Determine centre of each DBSCAN cluster
+        cluster_centres = []
+        for cluster_id in new_cluster_ids:
+            cluster_data = snapshot_data.loc[labels == cluster_id]
+            cluster_positions = cluster_data[pos_axes[0:dimensions]].values
+            cluster_centres.append(np.mean(cluster_positions, axis=0))
+        cluster_centres = np.array(cluster_centres)
 
-        # Reverse the array so that we can reverse the whole clusters array later
-        clusters += list(reversed(labels))
+        # Map new clusters to old clusters
+        cluster_map = {
+            -1: -1
+        }
+        if (len(old_clusters) > 0):
+            distances = pair_distances_two_sets(cluster_centres, old_clusters)
+            for old_cluster_id in range(0, len(old_clusters)):
+                # Find new cluster with smallest distance to the old cluster
+                closest_new_cluster = np.argmin(distances[:,old_cluster_id])
 
-    clusters = list(reversed(clusters))
+                # If the new cluster is already assigned...
+                if (closest_new_cluster in cluster_map.keys()):
+                    # ...compare distances and only assign if this cluster is closer
+                    other_cluster = cluster_map[closest_new_cluster]
+                    if (distances[closest_new_cluster, old_cluster_id] < distances[closest_new_cluster, other_cluster]):
+                        cluster_map[closest_new_cluster] = old_cluster_id
+                # Otherwise assign the new cluster to the old cluster
+                else:
+                    cluster_map[closest_new_cluster] = old_cluster_id
+
+        # Assign all unassigned new clusters to brand new cluster ids
+        for cluster_id in new_cluster_ids:
+            if ((cluster_id in cluster_map.keys()) == False):
+                if (len(cluster_map) == 0):
+                    cluster_map[cluster_id] = 0
+                else:
+                    cluster_map[cluster_id] = max(list(cluster_map.values())) + 1
+
+        # Apply the map
+        # Sort by value
+        cluster_map = dict(sorted(cluster_map.items(), key=lambda item: item[1]))
+        mapped_clusters = [cluster_map[c] for c in labels.tolist()]
+        print(snapshot, max(new_cluster_ids), cluster_centres)
+
+        # Remove -1
+        cluster_map.pop(-1, None)
+
+        old_clusters = np.array([cluster_centres[c] for c in list(cluster_map.keys())])
+
+        clusters += mapped_clusters
+
     return data.assign(dbscan_cluster_id=clusters)
     
 def find_indicate_indices(data: pd.DataFrame, dimensions: int, nearest_nn: int = 5, n_dist: int = 1, pos_axes: list = ["x", "y", "z"]) -> pd.DataFrame:
@@ -182,6 +221,7 @@ def analyse_clusters(data: pd.DataFrame, m_lower: float, m_upper: float) -> pd.D
         "snapshot": [],
         "cluster": [],
         
+        "no-of-stars": [],
         "ks-statistic": [],
         "ks-pvalue": [],
         "cs-statistic": [],
@@ -191,6 +231,7 @@ def analyse_clusters(data: pd.DataFrame, m_lower: float, m_upper: float) -> pd.D
         # "ks-statistic-2way": [],
         # "ks-pvalue-2way": [],
         
+        "indicate_no-of-stars": [],
         "indicate_ks-statistic": [],
         "indicate_ks-pvalue": [],
         "indicate_cs-statistic": [],
@@ -200,6 +241,7 @@ def analyse_clusters(data: pd.DataFrame, m_lower: float, m_upper: float) -> pd.D
         # "indicate_ks-statistic-2way": [],
         # "indicate_ks-pvalue-2way": [],
         
+        "bound_no-of-stars": [],
         "bound_ks-statistic": [],
         "bound_ks-pvalue": [],
         "bound_cs-statistic": [],
@@ -209,6 +251,7 @@ def analyse_clusters(data: pd.DataFrame, m_lower: float, m_upper: float) -> pd.D
         # "bound_ks-statistic-2way": [],
         # "bound_ks-pvalue-2way": [],
 
+        "indicate+bound_no-of-stars": [],
         "indicate+bound_ks-statistic": [],
         "indicate+bound_ks-pvalue": [],
         "indicate+bound_cs-statistic": [],
@@ -262,10 +305,13 @@ def analyse_clusters(data: pd.DataFrame, m_lower: float, m_upper: float) -> pd.D
             cluster_masses.append(masses[mask4])
 
             for m in cluster_masses:
-                # Skip if no masses
-                if (len(m) == 0):
+                no_of_stars = len(m)
+                print(f"Cluster {i}:")
+                print(f"No. of stars: {no_of_stars}")
+                # Skip if no/too few masses
+                if (no_of_stars < 2):
                     cluster_results += [
-                        -1,-1,-1,-1
+                        no_of_stars,-1,-1,-1,-1,-1,-1
                     ]
                     continue
 
@@ -274,13 +320,12 @@ def analyse_clusters(data: pd.DataFrame, m_lower: float, m_upper: float) -> pd.D
                 cs = imf.chisquare(m, n=10) # Not statistically valid due to low frequencies
                 cvm = imf.cvm_test(m)
 
-                print(f"Cluster {i}:")
                 print(f"ks-test statistic: {res.statistic}, p-value: {res.pvalue}")
                 print(f"chisquare statistic: {cs.statistic}, p-value: {cs.pvalue}")
                 print(f"cvm-test statistic: {cvm.statistic}, p-value: {cvm.pvalue}")
 
                 cluster_results += [
-                    res.statistic, res.pvalue, cs.statistic, cs.pvalue, cvm.statistic, cvm.pvalue
+                    no_of_stars, res.statistic, res.pvalue, cs.statistic, cs.pvalue, cvm.statistic, cvm.pvalue
                 ]
 
             cluster_results_frame.loc[len(cluster_results_frame)] = cluster_results
