@@ -1,5 +1,5 @@
 # Cluster Tool
-A script for analysing binary cluster simulations.
+A script for analysing clusters in n-body simulations.
 
 Clusters are identified using DBSCAN, INDICATE and the star's energies.
 The clusters are then compared to a standard Maschberger IMF model with the given
@@ -91,7 +91,7 @@ The main output file will have the columns included in the input file _plus_ the
 | `closest_cluster_id`  | The nearest cluster to the star as found by DBSCAN | 
 
 ### Statistics files (`*_stats.csv`)
-The first two clusters are the snapshot and the cluster id:
+The first two columns are the snapshot and the cluster id:
 
 | Name | Description |
 |------|-------------|
@@ -101,10 +101,11 @@ The first two clusters are the snapshot and the cluster id:
 After that lies the results for the statistical tests performed on the clusters:
 | Name | Description |
 |------|------|
+| `no-of-stars`   | Number of stars in the cluster |
 | `ks-statistic`  | ks-test statistic |
 | `ks-pvalue`     | ks-test p-value |
-| `cs-statistic`  | chi-squared test statistic |
-| `cs-pvalue`     | chi-squared test p-value |
+| `cs-statistic`  | Chi-squared test statistic **(do not use)** |
+| `cs-pvalue`     | Chi-squared test p-value **(do not use)** |
 | `cvm-statistic` | CvM test statistic |
 | `cvm-pvalue`    | CvM test p-value |
 
@@ -116,6 +117,16 @@ Clusters are determined by multiple methods, and the column names for the result
 | DBSCAN + graviationally bound | `bound_`| If (`ke` + `pe`)  < 0: use `closest_cluster_id`; else use -1 |
 | DBSCAN + INDICATE + graviationally bound | `indicate+bound_`| If (`indicate_index` > `indicate_sig_index`) **and** ((`ke` + `pe`) < 0): use `closest_cluster_id`; else use -1 |
 
+## Contributing
+You can contribute to this project in multiple ways:
+* 🐛 **Reporting bugs**: If you find any bugs, please let us know by [opening an issue](https://github.com/SunderB/cluster-tool/issues).
+* ✨ **Feature requests**: If there's a feature that would be really useful to add, [let us know on the discussion board](https://github.com/SunderB/cluster-tool/discussions/categories/feature-requests).
+* 📖 **Documentation**: If there's any errors or missing parts to any documentation, you can make improvements and [open a pull request](https://github.com/SunderB/cluster-tool/pulls).
+* 🖥️ **Code**: This project is open source, so anyone is free to modify the code as they wish. If you implement new functionality that may be useful to others, please consider [opening a pull request](https://github.com/SunderB/cluster-tool/pulls).
+
+## Disclaimer
+**There is no guarantee that there are not mistakes in the code! Use at your own risk.**
+
 ## Attribution
 
 ### References
@@ -126,9 +137,7 @@ Clusters are determined by multiple methods, and the column names for the result
 * [Blaylock-Squibbs, G. A., Parker, R. J., Buckner, A. S. M., and Güdel, M., “Investigating the structure of star-forming regions using INDICATE”, _Monthly Notices of the Royal Astronomical Society_, vol. 510, no. 2, pp. 2864–2882, 2022. doi:10.1093/mnras/stab3447.](https://ui.adsabs.harvard.edu/link_gateway/2022MNRAS.510.2864B/doi:10.1093/mnras/stab3447)
 
 ## License
-Cluster Tool is licensed under a MIT License.
+Cluster Tool is licensed under the [MIT License](LICENSE).
 
 The INDICATE module is based off code by George Baylock-Squibbs, which is based off [abuckner89/INDICATE](https://github.com/abuckner89/INDICATE) by Anne S.M. Buckner (used under the MIT License).
-
-
 
